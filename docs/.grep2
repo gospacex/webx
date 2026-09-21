@@ -1,0 +1,3 @@
+/Users/hyx/work/gowork/pkg/mod/github.com/cloudwego/hertz@v0.10.6/pkg/app/server/hertz.go:56:func (h *Hertz) Spin() {
+/Users/hyx/work/gowork/pkg/mod/github.com/cloudwego/hertz@v0.10.6/pkg/app/server/hertz.go:84:func (h *Hertz) SetCustomSignalWaiter(f func(err chan error) error) {
+/Users/hyx/work/gowork/pkg/mod/github.com/cloudwego/hertz@v0.10.6/pkg/app/server/hertz.go:115:func (h *Hertz) initOnRunHooks(errChan chan error) {

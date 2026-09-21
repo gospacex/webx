@@ -1,0 +1,8 @@
+/Users/hyx/work/gowork/pkg/mod/github.com/cloudwego/hertz@v0.10.6/pkg/route/engine.go:261:func (engine *Engine) IsRunning() bool {
+/Users/hyx/work/gowork/pkg/mod/github.com/cloudwego/hertz@v0.10.6/pkg/route/engine.go:307:func (engine *Engine) Shutdown(ctx context.Context) (err error) {
+/Users/hyx/work/gowork/pkg/mod/github.com/cloudwego/hertz@v0.10.6/pkg/route/engine.go:366:func (engine *Engine) Run() (err error) {
+65:	GET(string, ...app.HandlerFunc) IRoutes
+142:func (group *RouterGroup) GET(relativePath string, handlers ...app.HandlerFunc) IRoutes {
+195:	group.GET(relativePath, handler)
+218:	group.GET(urlPattern, handler)
+249:	return group.GET(relativePath, handler)
