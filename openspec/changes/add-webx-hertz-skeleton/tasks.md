@@ -22,9 +22,9 @@
 - [x] 4.4 单测：最小启动、缺省配置不 panic、单例同一指针、TestApp 随机端口、优雅停机排空
 
 ## 5. TLS / OTel
-- [ ] 5.1 `WithTLS` 证书加载 + H2；加载失败 fail fast 返回含路径错误
-- [ ] 5.2 OTel 装配：TracerProvider（OTLP gRPC）+ Meter（请求计数/耗时直方图/code 维度）；Shutdown flush
-- [ ] 5.3 单测/集成：临时自签证书 HTTPS+h2 用例、span 导出断言、指标计数断言
+- [x] 5.1 `WithTLS` 证书加载 + H2；加载失败 fail fast 返回含路径错误
+- [x] 5.2 OTel 装配：TracerProvider（OTLP gRPC）+ Meter（请求计数/耗时直方图/code 维度）；Shutdown flush
+- [x] 5.3 单测/集成：临时自签证书 HTTPS+h2 用例、span 导出断言、指标计数断言
 
 ## 6. examples 分层示例
 - [ ] 6.1 目录骨架 + `internal/config`（configx 绑定业务配置）+ `internal/model`（entity + Repository 接口 + 内存实现）

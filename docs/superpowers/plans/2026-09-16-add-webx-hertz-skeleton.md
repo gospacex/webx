@@ -1675,7 +1675,7 @@ git commit -m "feat: webx bootstrap (New options, health probes, AppSingleton, T
 - `middleware.AccessStats.MetricsBound() bool`（`s.reqCounter != nil`，测试断言接线成功）
 - TLS 加载失败错误串必须含 `TLSCertFile` 与 `TLSKeyFile` 两个路径（Task 4 `loadTLSCfg` 已实现，本 Task 加用例）
 
-- [ ] **步骤 1：编写失败测试**
+- [x] **步骤 1：编写失败测试**
 
 创建 `webx_tls_test.go`：
 
@@ -1861,12 +1861,12 @@ func TestMetricsBoundOnEnable(t *testing.T) {
 
 > 辅助：`newHertzClient(t)` 返回 `*client.Client`（`client.NewClient()`）；与 `webx_tls_test.go` 共享，实现时放 `webx_test.go` 或公共 `testhelpers_test.go`（若两测试文件各定义一次会重名——**落地时统一放 `testhelpers_test.go`**，并在文件头注释说明）。
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 运行：`go test . -run "TestTLS|TestOTel|TestMetrics" -v`
 预期：编译失败（`undefined: MetricsBound / WithMeterProvider` 等）——红灯。
 
-- [ ] **步骤 3：实现——`middleware/access_stats.go` 加测试钩子 + `webx.go` OTel 装配**
+- [x] **步骤 3：实现——`middleware/access_stats.go` 加测试钩子 + `webx.go` OTel 装配**
 
 `middleware/access_stats.go` 追加（在 `BindMeter` 之后）：
 
@@ -1903,19 +1903,25 @@ if cfg.MetricsEnabled {
 }
 ```
 
-- [ ] **步骤 4：运行测试确认通过**
+- [x] **步骤 4：运行测试确认通过**
 
 运行：`go test . -run "TestTLS|TestOTel|TestMetrics" -v`
 预期：全绿。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add webx.go config.go middleware/access_stats.go webx_tls_test.go webx_otel_test.go testhelpers_test.go
 git commit -m "feat: webx TLS fail-fast + OTel tracer/metric integration (ALPN h2 best-effort, InMemory span assertions)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+
+**Task 5 落地追加实测（hertz v0.10.6 + OTel v1.29.0）：**
+- `Hertz` 内嵌 `*route.Engine` 为字段：`h.Engine.Handlers` / `registerHealth(h.Engine, &cfg)`（非方法调用）。
+- `metric.MeterProvider` 为正确接口名（`otel/metric` meter.go:18），`config.MeterProvider` 字段与 `WithMeterProvider` 签名均用之。
+- hertz 客户端从 `SetRequestURI("https://...")` 自动识别 scheme，无需 `req.SetScheme`（该 API 在 v0.10.6 不存在）；共享辅助统一于 `testhelpers_test.go`。
+- `TestGracefulShutdownDrain`：停机前需等待请求入链（sleep 150ms），否则 in-flight 未产生、请求被拒 → 拿到 0。
 
 **⚠️ Open decision（H2）：** 真 H2 需 `github.com/cloudwego/hertz-contrib/h2`（本地无缓存、网络被拦截）。当前实现 = ALPN 通告 + h1-over-TLS 兜底。网络恢复后另开变更补 `engine.AddProtocol(suite.HTTP2, h2.NewFactory())` 真 H2 + ALPN 端到端断言；本变更按 fallback 交付。
 

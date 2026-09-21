@@ -35,7 +35,7 @@
 - 验证方式：`go test . -v` 全绿
 
 ### Task 5: TLS / OTel 集成
-- [ ] **任务完成**（与 superpowers plan `Task 5`、`tasks.md` 5.1-5.3 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 5`、`tasks.md` 5.1-5.3 同步勾选）
 - 目标：`WithTLS` 证书加载 + H2，加载失败 fail fast 返回含路径错误；OTel TracerProvider（OTLP gRPC）+ Meter（请求计数/耗时直方图/code 维度），Shutdown flush；临时自签证书 HTTPS+h2 集成用例、span 导出断言、指标计数断言
 - 改动文件：`webx.go`（TLS/OTel 装配）、`middleware/otel.go`（metrics）、`webx_tls_test.go`、`webx_otel_test.go`
 - 验证方式：`go test . -run "TestTLS|TestOTel" -v` 全绿
