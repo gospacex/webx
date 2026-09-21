@@ -77,7 +77,7 @@
 - 创建：`go.mod`、`go.sum`
 - 创建：`.git`（git init）
 
-- [ ] **步骤 1：git 初始化 + module 初始化**
+- [x] **步骤 1：git 初始化 + module 初始化**
 
 ```bash
 cd /Users/hyx/work/gowork/src/hubx/webx
@@ -87,7 +87,7 @@ go mod init github.com/gospacex/webx
 
 预期：`go.mod` 生成，module 名为 `github.com/gospacex/webx`。
 
-- [ ] **步骤 2：锁定依赖（hertz 对齐 protocolx 的 v0.10.x → v0.10.6；OTel 锁 v1.29.0 离线可用族；本地 replace logx/configx）**
+- [x] **步骤 2：锁定依赖（hertz 对齐 protocolx 的 v0.10.x → v0.10.6；OTel 锁 v1.29.0 离线可用族；本地 replace logx/configx）**
 
 ```bash
 go get github.com/cloudwego/hertz@v0.10.6
@@ -110,7 +110,7 @@ GOPROXY=off GOFLAGS=-mod=mod go mod tidy
 
 预期：`go.mod` 含 `replace github.com/gospacex/logx => ../logx` 与 `github.com/gospacex/configx => ../configx`（对齐 `hubx/protocolx` 根模块惯例），OTel 各包锁定 v1.29.0。
 
-- [ ] **步骤 3：验证构建与依赖树**
+- [x] **步骤 3：验证构建与依赖树**
 
 运行：
 
@@ -121,14 +121,14 @@ go mod graph | grep -E "golang.org/x/net/http|google.golang.org/grpc" || echo "O
 
 预期：第一行无输出（空 module 中仅有声明的包）；第二行输出 `OK: no net/http server stack`（依赖树无 `net/http` 服务端路径，gRPC 栈同样不在）。
 
-- [ ] **步骤 4：Commit**
+- [x] **步骤 4：Commit**
 
 ```bash
 git add -A
 git commit -m "chore: scaffold github.com/gospacex/webx module (hertz v0.10.6 + local logx/configx)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
 
 ---
 

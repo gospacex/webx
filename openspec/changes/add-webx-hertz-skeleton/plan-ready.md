@@ -11,7 +11,7 @@
 > 按执行依赖排序：envelope 无外部依赖先行，中间件依赖 envelope，bootstrap 装配中间件，TLS/OTel 叠加在 bootstrap 之上，examples 依赖全部核心能力，端到端与验收殿后。
 
 ### Task 1: 模块脚手架与依赖
-- [ ] **任务完成**（与 superpowers plan `Task 1`、`tasks.md` 1.1/1.2 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 1`、`tasks.md` 1.1/1.2 同步勾选）
 - 目标：`hubx/webx` 初始化为 Go module `github.com/gospacex/webx`（含 git init），go.mod 锁定 hertz/logx/configx/otel/uuid 依赖（hertz 版本对齐 protocolx 的 v0.10.x），replace 指向本地 ../logx ../configx；全依赖树无 net/http 服务端路径
 - 改动文件：`go.mod`、`go.sum`、git 初始化
 - 验证方式：`go build ./...` 通过；`go mod graph | grep "net/http"` 无服务端栈

@@ -1,8 +1,8 @@
 # Tasks: add-webx-hertz-skeleton
 
 ## 1. 模块脚手架
-- [ ] 1.1 初始化 `hubx/webx` 为 Go module `github.com/gospacex/webx`（go.mod + replace 指向本地 logx/configx，对齐 protocolx 惯例）
-- [ ] 1.2 依赖锁定：`github.com/cloudwego/hertz`（版本对齐 protocolx/http 的 v0.10.x）、`go.opentelemetry.io/otel`、`google/uuid`；确认 `go build` 通过且依赖树无 `net/http` 服务端路径
+- [x] 1.1 初始化 `hubx/webx` 为 Go module `github.com/gospacex/webx`（go.mod + replace 指向本地 logx/configx，对齐 protocolx 惯例）
+- [x] 1.2 依赖锁定：`github.com/cloudwego/hertz`（版本对齐 protocolx/http 的 v0.10.x）、`go.opentelemetry.io/otel`、`google/uuid`；确认 `go build` 通过且依赖树无 `net/http` 服务端路径 <!-- 已实现: hertz v0.10.6 + otel v1.29.0 族 + 本地 logx/configx replace，构建通过 -->
 
 ## 2. envelope（统一响应 + 错误码）
 - [ ] 2.1 `envelope/envelope.go`：`Response{Code, Message, Data, RequestID}` + `Render(c *app.RequestContext, data any, err error)`；`envelope.Error`（code+message，实现 error 与 Is）+ 分段错误码常量（1xxx/2xxx/4xxx/5xxx）+ `CodeToStatus` HTTP 映射表
