@@ -1955,7 +1955,7 @@ git commit -m "feat: webx TLS fail-fast + OTel tracer/metric integration (ALPN h
 - `logx.New(logx.Config{...})` 需 blank-import `github.com/gospacex/logx/zap` 注册 provider；`logxzap.SetupTracerProvider(logx.OTelConfig) (*logxzap.TracerSetup, error)`，`TracerSetup.Provider *sdktrace.TracerProvider`（同时 `otel.SetTracerProvider` 全局生效）；OTel.Enabled=true 时 logx 各 `*Context` 方法自动把日志挂为 ctx 活动 span 的 event + trace_id/span_id 字段（`logx/zap` 已实现，本 Task 只消费）。
 - handler 单测（chain-unit）：`ctx := app.NewContext(0)` + `ctx.Request.SetMethod("GET")` + `ctx.Params = param.Params{{Key:"id",Value:"42"}}` + `ctx.SetHandlers(app.HandlersChain{handlerFn})` + `ctx.Next(ctxWithSpan)` → 断言 `ctx.Response.Body()` JSON。
 
-- [ ] **步骤 1：编写失败测试（config / model / service / logic / handler 各层）**
+- [x] **步骤 1：编写失败测试（config / model / service / logic / handler 各层）**
 
 创建 `examples/internal/model/order_test.go`：
 
@@ -2153,12 +2153,12 @@ func TestHandlerRendersEnvelope(t *testing.T) {
 
 > 契约明确：**nil 依赖 = fail fast 1001**（handler 首行 `if h.Logic == nil { envelope.Render(c, nil, envelope.ErrBadRequest); return }`）——避免单测传 nil 时 panic。
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 运行：`go test ./examples/... -v`
 预期：编译失败（各层 undefined）——红灯。
 
-- [ ] **步骤 3：实现各层（model → service → logic → handler → middleware → routes）**
+- [x] **步骤 3：实现各层（model → service → logic → handler → middleware → routes）**
 
 创建 `examples/internal/config/config.go`：
 
@@ -2492,7 +2492,7 @@ func RegisterRoutes(e *route.Engine, h *handler.OrderHandler) {
 }
 ```
 
-- [ ] **步骤 4：实现调用链开关装配 + cmd 一行启动**
+- [x] **步骤 4：实现调用链开关装配 + cmd 一行启动**
 
 创建 `examples/internal/trace/trace.go`（装配逻辑抽为可测函数，供 6.5 两态测试注入；**包路径定死为 `examples/internal/trace`**——与 `examples/cmd`（package main）不能同目录）：
 
@@ -2624,7 +2624,7 @@ demo:
     exporter: stdout
 ```
 
-- [ ] **步骤 5：编写调用链开关两态测试**
+- [x] **步骤 5：编写调用链开关两态测试**
 
 创建 `examples/trace_switch_test.go`：
 
@@ -2723,7 +2723,7 @@ func TestTraceSwitchOnSpanTree(t *testing.T) {
 
 > **说明（开关两态用例口径）：** 两态测试断言的是**开关行为**——关闭态：`BuildTracer` 返回 noop、发请求 200 且 InMemory exporter 0 span（本测试通过「关闭态未注入 exporter」隐含成立，断言 `!enabled`）；开启态：span 树（root 名 `<METHOD> <path>` + 各层子 span + 父子关系）经 InMemory exporter 断言。开启态「各层日志 trace_id 一致 + 日志挂 span event」由 logx/zap 既有实现保证（`*Context` 方法 + `OTel.Enabled=true`），端到端贯穿断言在 Task 7 `examples/e2e_test.go` 补真实 HTTP 全链路。
 
-- [ ] **步骤 6：运行全部测试确认通过 + 冒烟**
+- [x] **步骤 6：运行全部测试确认通过 + 冒烟**
 
 运行：
 
@@ -2740,14 +2740,20 @@ cd examples && HUBX_CONFIG=config-on.yaml  go run ./cmd   # 开关开：stdout e
 # 冒烟配置 config-on.yaml：demo.trace.enabled: true, exporter: stdout（不入库，仅冒烟用）
 ```
 
-- [ ] **步骤 7：Commit**
+- [x] **步骤 7：Commit**
 
 ```bash
 git add examples/
 git commit -m "feat: webx examples layered demo (configx+logx+webx one-line boot, trace switch on/off, per-layer unit tests)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+
+**Task 6 落地追加实测：**
+- `examples/` 属 module 内 package：各层包路径 `github.com/gospacex/webx/examples/internal/...`，与 webx 根包共享 module。
+- logic 层 nil Svc 契约：`Svc==nil` → 1001 fail fast（`logic.Get` 内判空，handler 仅前置判 Logic==nil）。
+- `SpanStub.SpanContext` 为结构体字段（非方法）；`span.End()` 无返回值（不可 `_ =` 赋值）。
+- `a.Engine` 为 `*server.Hertz` 内嵌 `*route.Engine` 字段：cmd/main.go 经 `exapp.RegisterRoutes(a.Engine, hdl)` 注册路由。
 
 ---
 

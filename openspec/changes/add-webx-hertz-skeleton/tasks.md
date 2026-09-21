@@ -27,11 +27,11 @@
 - [x] 5.3 单测/集成：临时自签证书 HTTPS+h2 用例、span 导出断言、指标计数断言
 
 ## 6. examples 分层示例
-- [ ] 6.1 目录骨架 + `internal/config`（configx 绑定业务配置）+ `internal/model`（entity + Repository 接口 + 内存实现）
-- [ ] 6.2 `app/handler`（薄 handler）+ `app/routes.go`（注册源唯一）+ `internal/logic`（参数转换 + 调 service）
-- [ ] 6.3 `internal/service`（业务核心 + 子 span）+ `internal/middleware`（鉴权业务中间件）+ `cmd/main.go`（一行启动）
-- [ ] 6.4 各层单测（handler/logic/service/model，接口注入）
-- [ ] 6.5 调用链开关：`internal/config` 增加 `Trace{Enabled, Exporter}`（configx 绑定 `demo.trace`，默认 false）；cmd 层开启时以 `OTel.Enabled=true` 构造 logx logger 并 `logx/zap.SetupTracerProvider` 装配 TracerProvider；`app/routes.go` 入口中间件开 root span（`<METHOD> <path>`），各层开子 span；开启/关闭两态各一测试用例（开启态断言 span 树 + 各层日志 trace_id 一致且挂 span event；关闭态断言无 span、行为不变）
+- [x] 6.1 目录骨架 + `internal/config`（configx 绑定业务配置）+ `internal/model`（entity + Repository 接口 + 内存实现）
+- [x] 6.2 `app/handler`（薄 handler）+ `app/routes.go`（注册源唯一）+ `internal/logic`（参数转换 + 调 service）
+- [x] 6.3 `internal/service`（业务核心 + 子 span）+ `internal/middleware`（鉴权业务中间件）+ `cmd/main.go`（一行启动）
+- [x] 6.4 各层单测（handler/logic/service/model，接口注入）
+- [x] 6.5 调用链开关：`internal/config` 增加 `Trace{Enabled, Exporter}`（configx 绑定 `demo.trace`，默认 false）；cmd 层开启时以 `OTel.Enabled=true` 构造 logx logger 并 `logx/zap.SetupTracerProvider` 装配 TracerProvider；`app/routes.go` 入口中间件开 root span（`<METHOD> <path>`），各层开子 span；开启/关闭两态各一测试用例（开启态断言 span 树 + 各层日志 trace_id 一致且挂 span event；关闭态断言无 span、行为不变）
 
 ## 7. 端到端与验收
 - [ ] 7.1 端到端用例：调用链贯穿断言（请求 X-Request-Id == 响应 request_id == 三层日志 trace_id）

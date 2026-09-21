@@ -41,7 +41,7 @@
 - 验证方式：`go test . -run "TestTLS|TestOTel" -v` 全绿
 
 ### Task 6: examples 分层示例
-- [ ] **任务完成**（与 superpowers plan `Task 6`、`tasks.md` 6.1-6.5 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 6`、`tasks.md` 6.1-6.5 同步勾选）
 - 目标：`examples/` 分层 demo —— `cmd/main.go`（configx+logx+webx 一行启动）、`app/handler`（薄 handler）+ `app/routes.go`（注册源唯一）、`internal/config`（业务配置含 `Trace{Enabled,Exporter}` 调用链开关）、`internal/model`（Order entity + Repository 接口 + 内存实现）、`internal/logic`（参数转换 + 调 service）、`internal/service`（业务核心 + 子 span + 2xxx 错误）、`internal/middleware`（鉴权）；**调用链开关**：开启时 cmd 以 `OTel.Enabled=true` 构造 logx 并经 `logx/zap.SetupTracerProvider` 装配 TracerProvider，`routes.go` 入口开 root span、各层开子 span 并经 logx context 方法入链（日志挂 span event + trace_id）；关闭态（默认）无 span、行为不变；各层单测（接口注入）+ 开关两态用例
 - 改动文件：`examples/cmd/main.go`、`examples/app/**`、`examples/internal/**`、`examples/config.yaml`、`examples/internal/**/*_test.go`
 - 验证方式：`go test ./examples/... -v` 全绿；`go run ./examples/cmd` 冒烟（开关开/关各一次）
