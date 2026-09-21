@@ -9,11 +9,11 @@
 - [x] 2.2 单测：成功/失败渲染、`errors.Is` 判定、错误码表完整性（表驱动） <!-- 已实现: envelope/codes.go+envelope.go 全绿 -->
 
 ## 3. 中间件链
-- [ ] 3.1 `middleware/recovery.go` + `middleware/timeout.go`：panic→5001/500、超时→5002/504，错误路径打 logx 日志
-- [ ] 3.2 `middleware/ratelimit.go` + `middleware/cors.go`：令牌桶按 IP（429/4290）、预检放行/拒绝
-- [ ] 3.3 `middleware/otel.go` + `middleware/logging.go`：root span（`<METHOD> <path>`）、trace-id 注入 ctx + `X-Request-Id` 响应头、access 日志（method/path/status/duration，caller 归因）
-- [ ] 3.4 中间件默认链装配（recovery→otel→logx→ratelimit→cors→timeout→业务），`webx.WithMiddleware` 追加于链尾
-- [ ] 3.5 单测：recovery/timeout/ratelimit/cors/otel/logx 各一功能用例 + 链顺序组合用例
+- [x] 3.1 `middleware/recovery.go` + `middleware/timeout.go`：panic→5001/500、超时→5002/504，错误路径打 logx 日志
+- [x] 3.2 `middleware/ratelimit.go` + `middleware/cors.go`：令牌桶按 IP（429/4290）、预检放行/拒绝
+- [x] 3.3 `middleware/otel.go` + `middleware/logging.go`：root span（`<METHOD> <path>`）、trace-id 注入 ctx + `X-Request-Id` 响应头、access 日志（method/path/status/duration，caller 归因）
+- [x] 3.4 中间件默认链装配（recovery→otel→logx→ratelimit→cors→timeout→业务），`webx.WithMiddleware` 追加于链尾
+- [x] 3.5 单测：recovery/timeout/ratelimit/cors/otel/logx 各一功能用例 + 链顺序组合用例
 
 ## 4. webx bootstrap
 - [ ] 4.1 `webx.go`：`App`（内嵌 `*hertz.App`）+ `New(opts...)` 选项（Config/WithLogger/WithTLS/WithMiddleware/WithReadyCheck/WithOTLP/WithMetrics）+ health 端点自动挂载（`/healthz/live`、`/healthz/ready`）

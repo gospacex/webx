@@ -23,7 +23,7 @@
 - 验证方式：`go test ./envelope/ -v` 全绿
 
 ### Task 3: 中间件链
-- [ ] **任务完成**（与 superpowers plan `Task 3`、`tasks.md` 3.1-3.5 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 3`、`tasks.md` 3.1-3.5 同步勾选）
 - 目标：recovery(panic→5001/500)、timeout(→5002/504)、ratelimit(令牌桶按 IP→429/4290)、cors(预检放行/拒绝)、otel(root span `<METHOD> <path>` + trace-id 注入 + X-Request-Id)、logx(access 日志 caller 归因)；默认链 recovery→otel→logx→ratelimit→cors→timeout→业务，WithMiddleware 追加链尾；每个中间件一个功能用例 + 链顺序组合用例
 - 改动文件：`middleware/recovery.go`、`middleware/timeout.go`、`middleware/ratelimit.go`、`middleware/cors.go`、`middleware/otel.go`、`middleware/logging.go` + 对应 `_test.go`
 - 验证方式：`go test ./middleware/ -v` 全绿

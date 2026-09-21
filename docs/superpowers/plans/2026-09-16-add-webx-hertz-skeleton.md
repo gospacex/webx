@@ -452,7 +452,7 @@ git commit -m "feat: envelope unified response + segmented error codes (errors.I
 - 测试内 logger 用 `logx.GetGlobal()`（无 provider 注册时返回 noop，安全，不 blank-import `logx/zap`）。
 - 默认链顺序 `recovery → otel → logging → ratelimit → cors → timeout → 业务`；`DefaultChain` 只产出前 6 个（业务与 `WithMiddleware` 追加由 Task 4 负责）。
 
-- [ ] **步骤 1：编写失败测试（每中间件一功能用例 + 链顺序组合用例）**
+- [x] **步骤 1：编写失败测试（每中间件一功能用例 + 链顺序组合用例）**
 
 创建 `middleware/recovery_test.go`：
 
@@ -757,12 +757,12 @@ func TestDefaultChainOrder(t *testing.T) {
 }
 ```
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 运行：`go test ./middleware/ -v`
 预期：编译失败（`undefined: Recovery / Timeout / RateLimit / CORS / Otel / Logging / NewAccessStats / DefaultChain`）——红灯。
 
-- [ ] **步骤 3：实现 `middleware/access_stats.go`（线程安全记录器 + 指标接线）**
+- [x] **步骤 3：实现 `middleware/access_stats.go`（线程安全记录器 + 指标接线）**
 
 ```go
 package middleware
@@ -1125,19 +1125,19 @@ func DefaultChain(tr trace.Tracer, stats *AccessStats, l logx.Logger,
 
 > 类型一致性修正（以此节为准）：`middleware.Logging(l logx.Logger, stats *AccessStats)`、`middleware.DefaultChain(tr, stats, l, rps, burst, corsOrigins, timeout)`——替代 File Structure 锚点中旧签名单行。
 
-- [ ] **步骤 4：运行测试确认通过**
+- [x] **步骤 4：运行测试确认通过**
 
 运行：`go test ./middleware/ -v`
 预期：全绿。
 
-- [ ] **步骤 5：Commit**
+- [x] **步骤 5：Commit**
 
 ```bash
 git add middleware/
 git commit -m "feat: webx middleware chain (recovery/timeout/ratelimit/cors/otel/logging + DefaultChain + AccessStats)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
 
 ---
 
