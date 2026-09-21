@@ -2768,7 +2768,7 @@ git commit -m "feat: webx examples layered demo (configx+logx+webx one-line boot
 
 **贯穿断言语义（执行前必读，与 spec 对齐）：**
 - 断言链 = **响应头 `X-Request-Id` == 响应 body `request_id` == 三层日志 `trace_id`**。服务端 otel 中间件生成的 trace-id 即该请求的 request-id（Task 3 设计：`envelope.RequestID` 取 span trace-id），故三段天然一致。
-- 注记：tasks.md 7.1 字面「请求 X-Request-Id == 响应 request_id」——本骨架语义下 **client 携带的 X-Request-Id 不作为 trace-id 种子**（W3C traceparent 传播列为后续变更）；e2e 断言的是「该请求路径上的 X-Request-Id（服务端经响应头下发）与响应/日志闭环一致」。
+- 注记（原口径，已被 close 阶段 H1 修复取代）：tasks.md 7.1 字面「请求 X-Request-Id == 响应 request_id」——原实现 client 携带的 X-Request-Id 不作为 trace-id 种子（W3C traceparent 传播列为后续变更）。**close 代码审查 H1（归档阻断项）已实现入站种子化**：`middleware/otel.go` 读入站 `X-Request-Id`，合法 32-hex 时经 `trace.ContextWithRemoteSpanContext` 作为 trace-id 种子（SDK 继承 trace-id、本地重生成 span-id），非法/缺失由 SDK 生成；e2e 现断言「入站 X-Request-Id == 响应 X-Request-Id == body request_id == 三层日志 trace_id」。W3C `traceparent` 头传播仍为后续变更（32-hex request-id 头已满足本骨架贯穿语义）。
 - 注记：spec 场景写「handler、service、model 三层」——examples 骨架中 model 层（MemRepo）为接口+内存实现、默认不产日志；e2e 取**实际产生日志的三层 handler/logic/service**（各自 `InfoContext`，caller 归因指向各层文件）。若后续 model 层加日志，仅需在 `readJSONLogs` 断言里追加一条。
 - 三层日志 `trace_id` 一致依赖：logx `OTel.Enabled=true` 时 zap 实现自动附加 trace_id 字段（`logx/zap` 既有能力，本 Task 只消费）。
 
@@ -2983,5 +2983,5 @@ git commit -m "test: e2e trace pass-through (X-Request-Id == body request_id == 
 - [x] **占位符扫描**：全文 `grep -n "TODO\|TBD\|占位\|...\|\[ \]"`——代码块内不得有未实现函数体；`- [ ]` 仅出现在 Step/Task complete 复选框。
 - [x] **类型一致性**：以「类型一致性锚点」+ 各 Task「契约」节为准（Task 3 的 `Logging(l, stats)` / `DefaultChain(tr, stats, l, rps, burst, origins, timeout)` 签名覆盖 File Structure 表旧锚点行；Task 4 `AppSingleton` 命名校正生效）。
 - [x] **三文档 checkbox 对齐**：tasks.md `N.M` ↔ plan-ready `**任务完成**` ↔ 本计划 Step `- [ ]` 与 Task `- [ ] **Task complete**`。
-- [x] **Open decision 已surfaced**：H2（`hertz-contrib/h2` 缺失 → ALPN 尽力 + h1-over-TLS 兜底，Task 5 末）；OTLP gRPC（离线无缓存 → HTTP exporter + logx 装配，Task 5 头部）；client 携带 X-Request-Id 不作 trace 种子（W3C traceparent 后续变更，Task 7 头部）。
+- [x] **Open decision 已surfaced**：H2（`hertz-contrib/h2` 缺失 → ALPN 尽力 + h1-over-TLS 兜底，Task 5 末）；OTLP gRPC（离线无缓存 → HTTP exporter + logx 装配，Task 5 头部）；入站 X-Request-Id 种子化——close 代码审查 H1 已修复（32-hex request-id 头经 ContextWithRemoteSpanContext 种子化；W3C traceparent 头传播仍为后续变更）。
 

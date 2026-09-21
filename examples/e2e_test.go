@@ -105,6 +105,9 @@ func TestE2ETracePassThrough(t *testing.T) {
 	req.SetMethod("GET")
 	req.SetRequestURI(a.URL() + "/orders/1")
 	req.Header.Set("X-Token", "demo")
+	// 入站携带 X-Request-Id（32-hex）→ 服务端应将其作为 trace-id 种子贯穿响应与日志
+	const inbound = "0af7651916cd43dd8448eb211c80319c"
+	req.Header.Set("X-Request-Id", inbound)
 	resp := &protocol.Response{}
 	if err := hc.Do(context.Background(), req, resp); err != nil {
 		t.Fatalf("Do: %v", err)
@@ -123,13 +126,16 @@ func TestE2ETracePassThrough(t *testing.T) {
 		t.Fatalf("body code = %d, want 0", body.Code)
 	}
 
-	// 断言链 ① 响应头 == 响应 body
+	// 断言链 ① 响应头 == 响应 body == 入站 X-Request-Id（trace-id 贯穿）
 	rid := string(resp.Header.Peek("X-Request-Id"))
 	if rid == "" {
 		t.Fatal("response X-Request-Id header empty")
 	}
 	if rid != body.RequestID {
 		t.Fatalf("header X-Request-Id %q != body request_id %q", rid, body.RequestID)
+	}
+	if rid != inbound {
+		t.Fatalf("header X-Request-Id %q != inbound %q (trace-id 未贯穿)", rid, inbound)
 	}
 
 	// 断言链 ② 三层日志 trace_id 全部 == rid（logx OTel.Enabled=true 自动附加 trace_id）
