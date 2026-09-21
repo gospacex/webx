@@ -48,6 +48,7 @@ func New(opts ...Option) (*App, error) {
 		cfg.Middlewares...,
 	)
 	registerHealth(h.Engine, &cfg)
+	bindMetrics(&cfg)
 
 	return &App{Hertz: h, cfg: cfg, stats: cfg.Stats}, nil
 }

@@ -64,6 +64,13 @@ func (s *AccessStats) Record(ctx context.Context, status int, dur time.Duration)
 	}
 }
 
+// MetricsBound instrument 是否已接线（测试断言用）
+func (s *AccessStats) MetricsBound() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reqCounter != nil
+}
+
 // BindMeter 由 webx 根包（Task 5）在 Meter 可用时接线 instrument
 func (s *AccessStats) BindMeter(meter metric.Meter) error {
 	var err error
