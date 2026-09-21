@@ -47,7 +47,7 @@
 - 验证方式：`go test ./examples/... -v` 全绿；`go run ./examples/cmd` 冒烟（开关开/关各一次）
 
 ### Task 7: 端到端与验收
-- [ ] **任务完成**（与 superpowers plan `Task 7`、`tasks.md` 7.1-7.3 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 7`、`tasks.md` 7.1-7.3 同步勾选）
 - 目标：端到端"调用链贯穿"用例（请求 X-Request-Id == 响应 request_id == handler/service/model 三层日志 trace_id）；`go test -cover ./...` 核心三包 ≥ 80%、`go test -race ./...` 全量回归；`openspec validate add-webx-hertz-skeleton --strict` 通过
 - 改动文件：`examples/e2e_test.go`、覆盖率报告
 - 验证方式：覆盖率达标 + strict 校验输出 valid

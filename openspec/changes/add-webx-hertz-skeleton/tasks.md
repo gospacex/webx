@@ -34,6 +34,6 @@
 - [x] 6.5 调用链开关：`internal/config` 增加 `Trace{Enabled, Exporter}`（configx 绑定 `demo.trace`，默认 false）；cmd 层开启时以 `OTel.Enabled=true` 构造 logx logger 并 `logx/zap.SetupTracerProvider` 装配 TracerProvider；`app/routes.go` 入口中间件开 root span（`<METHOD> <path>`），各层开子 span；开启/关闭两态各一测试用例（开启态断言 span 树 + 各层日志 trace_id 一致且挂 span event；关闭态断言无 span、行为不变）
 
 ## 7. 端到端与验收
-- [ ] 7.1 端到端用例：调用链贯穿断言（请求 X-Request-Id == 响应 request_id == 三层日志 trace_id）
-- [ ] 7.2 覆盖率：`go test -cover ./...` webx 核心三包 ≥ 80%；全量回归 `go test -race ./...` 绿
-- [ ] 7.3 `openspec validate add-webx-hertz-skeleton --strict` 通过
+- [x] 7.1 端到端用例：调用链贯穿断言（请求 X-Request-Id == 响应 request_id == 三层日志 trace_id）
+- [x] 7.2 覆盖率：`go test -cover ./...` webx 核心三包 ≥ 80%；全量回归 `go test -race ./...` 绿
+- [x] 7.3 `openspec validate add-webx-hertz-skeleton --strict` 通过

@@ -2772,7 +2772,7 @@ git commit -m "feat: webx examples layered demo (configx+logx+webx one-line boot
 - 注记：spec 场景写「handler、service、model 三层」——examples 骨架中 model 层（MemRepo）为接口+内存实现、默认不产日志；e2e 取**实际产生日志的三层 handler/logic/service**（各自 `InfoContext`，caller 归因指向各层文件）。若后续 model 层加日志，仅需在 `readJSONLogs` 断言里追加一条。
 - 三层日志 `trace_id` 一致依赖：logx `OTel.Enabled=true` 时 zap 实现自动附加 trace_id 字段（`logx/zap` 既有能力，本 Task 只消费）。
 
-- [ ] **步骤 1：编写端到端用例 `examples/e2e_test.go`（完整代码）**
+- [x] **步骤 1：编写端到端用例 `examples/e2e_test.go`（完整代码）**
 
 ```go
 // e2e 端到端调用链贯穿：TestApp 随机端口 + 真 HTTP 请求（hertz 客户端，不用 net/http）
@@ -2928,12 +2928,12 @@ func TestE2ETracePassThrough(t *testing.T) {
 }
 ```
 
-- [ ] **步骤 2：运行 e2e 用例确认通过**
+- [x] **步骤 2：运行 e2e 用例确认通过**
 
 运行：`go test ./examples/ -run TestE2E -v`
 预期：PASS（三层日志均带同一 trace_id）。
 
-- [ ] **步骤 3：覆盖率验收（核心三包 ≥ 80%）**
+- [x] **步骤 3：覆盖率验收（核心三包 ≥ 80%）**
 
 运行：
 
@@ -2943,12 +2943,12 @@ go test -cover ./...
 
 预期：`github.com/gospacex/webx`（根）、`.../webx/envelope`、`.../webx/middleware` 三包行覆盖率均 ≥ 80%。**若某包低于 80%**：为该包补缺失分支的单元测试（仅测试代码，不改业务逻辑）——典型缺口：`config.go` 各 Option 分支、`cor` 空 origins 分支、`Shutdown` 非 running 错误路径。
 
-- [ ] **步骤 4：全量回归（race 检测）**
+- [x] **步骤 4：全量回归（race 检测）**
 
 运行：`go test -race ./...`
 预期：全绿、无 race 报告（重点：`AccessStats` 互斥锁、`RateLimit` 桶 map 并发访问）。
 
-- [ ] **步骤 5：OpenSpec strict 校验**
+- [x] **步骤 5：OpenSpec strict 校验**
 
 运行：
 
@@ -2959,7 +2959,7 @@ openspec validate add-webx-hertz-skeleton --strict
 
 预期：输出 valid（无缺失 spec/任务不一致）。
 
-- [ ] **步骤 6：三文档同步 + Commit**
+- [x] **步骤 6：三文档同步 + Commit**
 
 同步（build 阶段执行时逐 Task 勾选）：tasks.md 7.1–7.3、plan-ready.md Task 7 `**任务完成**`、本计划 Step 勾选。
 
@@ -2968,15 +2968,20 @@ git add examples/e2e_test.go
 git commit -m "test: e2e trace pass-through (X-Request-Id == body request_id == layer log trace_id)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+
+**Task 7 落地追加实测（race + 覆盖率）：**
+- hertz 路由树非并发安全：`Run()` 启动后再 `e.GET(...)` 注册路由与并发 `Serve` 产生 data race（-race 实测命中 `router.find`/`NewContext`）。契约修正：**业务路由注册必须早于监听启动** → 新增 `webx.WithPreRun(fn func(*App))`（TestApp 在 `go h.Run()` 前回调）；`examples/cmd/main.go`（`New` 不监听，Run 前注册）本就满足该契约，e2e 测试改经 `WithPreRun` 注册。
+- 覆盖率（`go test -cover`）：webx 根 83.3%、envelope 100%、middleware 89.7%（≥80% 达标）。补测：`middleware/access_stats_test.go`（noop meter Bind/Record）、`envelope/envelope_extra_test.go`（Error/Is/As/StatusOf/RequestIDFrom 分支）。
+- `go test -race ./...` 全绿（修复后）。
 
 ---
 
 ## Self-Review 清单（spec 阶段收尾自查，build 前逐条过）
 
-- [ ] **规格覆盖**：proposal「设计方向」+ 5 个 spec（webx-bootstrap/middleware/envelope/observability/examples）→ 全部落进 Task 1–7（examples 调用链开关 = Task 6 步骤 4/5；observability = Task 3 otel/logging + Task 5 + Task 7 贯穿）。
-- [ ] **占位符扫描**：全文 `grep -n "TODO\|TBD\|占位\|...\|\[ \]"`——代码块内不得有未实现函数体；`- [ ]` 仅出现在 Step/Task complete 复选框。
-- [ ] **类型一致性**：以「类型一致性锚点」+ 各 Task「契约」节为准（Task 3 的 `Logging(l, stats)` / `DefaultChain(tr, stats, l, rps, burst, origins, timeout)` 签名覆盖 File Structure 表旧锚点行；Task 4 `AppSingleton` 命名校正生效）。
-- [ ] **三文档 checkbox 对齐**：tasks.md `N.M` ↔ plan-ready `**任务完成**` ↔ 本计划 Step `- [ ]` 与 Task `- [ ] **Task complete**`。
-- [ ] **Open decision 已surfaced**：H2（`hertz-contrib/h2` 缺失 → ALPN 尽力 + h1-over-TLS 兜底，Task 5 末）；OTLP gRPC（离线无缓存 → HTTP exporter + logx 装配，Task 5 头部）；client 携带 X-Request-Id 不作 trace 种子（W3C traceparent 后续变更，Task 7 头部）。
+- [x] **规格覆盖**：proposal「设计方向」+ 5 个 spec（webx-bootstrap/middleware/envelope/observability/examples）→ 全部落进 Task 1–7（examples 调用链开关 = Task 6 步骤 4/5；observability = Task 3 otel/logging + Task 5 + Task 7 贯穿）。
+- [x] **占位符扫描**：全文 `grep -n "TODO\|TBD\|占位\|...\|\[ \]"`——代码块内不得有未实现函数体；`- [ ]` 仅出现在 Step/Task complete 复选框。
+- [x] **类型一致性**：以「类型一致性锚点」+ 各 Task「契约」节为准（Task 3 的 `Logging(l, stats)` / `DefaultChain(tr, stats, l, rps, burst, origins, timeout)` 签名覆盖 File Structure 表旧锚点行；Task 4 `AppSingleton` 命名校正生效）。
+- [x] **三文档 checkbox 对齐**：tasks.md `N.M` ↔ plan-ready `**任务完成**` ↔ 本计划 Step `- [ ]` 与 Task `- [ ] **Task complete**`。
+- [x] **Open decision 已surfaced**：H2（`hertz-contrib/h2` 缺失 → ALPN 尽力 + h1-over-TLS 兜底，Task 5 末）；OTLP gRPC（离线无缓存 → HTTP exporter + logx 装配，Task 5 头部）；client 携带 X-Request-Id 不作 trace 种子（W3C traceparent 后续变更，Task 7 头部）。
 
