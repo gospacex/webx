@@ -59,6 +59,12 @@
 - ❌ `c.RequestCtx()`（RequestContext 无此方法）→ ✅ 测试用 `ctx := app.NewContext(0)`；生产链路里 hertz 会 `ServeHTTP(c context.Context, ctx *app.RequestContext)` 直接传入。
 - ❌ 把 `*app.RequestContext` 当 `context.Context` 用（它只有 `Value`，无 `Deadline/Done/Err`）→ ✅ request-id 经 hertz 的 `c.Set(key,val)` / `c.Get(key)`（`ctx.Keys` map）流转，不引入 std context。
 
+**Task 3 落地追加实测（OTel v1.29.0 Go SDK + hertz v0.10.6）：**
+- `tracer.Start(ctx, name)` 在 Go SDK v1.29.0 返回 **双值 `(context.Context, trace.Span)`**（ctx 已含活动 span）——所有 `span := tr.Start(...)` 均写为 `ctx, span := tr.Start(ctx, name)`，下游直接 `c.Next(ctx)`（不再需要 `trace.ContextWithSpan`）。
+- `otel.NewTracerProvider()` 在 otel v1.29.0 根包**不存在** → 全局句柄一律 `otel.GetTracerProvider()`（缺省 noop delegate，安全）。
+- 无人写体跑完 chain 时 hertz 默认响应为 **200 Hello Hertz**（非 0）——超时守卫前置短路需 `c.Abort()` 停链（`return` 不会阻止引擎调 `engine.RootHandlers` 默认 200 填充）。
+- `c.RemoteAddr()` 返回 `net.Addr` → 日志用 `.String()`。
+
 **Task 2 落地追加实测（v0.10.6）：**
 - `c.Get(key)` 返回**双值** `(any, bool)`（非 `c.Get(key).(string)` 单值形式）——`envelope.RequestIDFrom` 已按双值写法实现（`if v, ok := c.Get(requestIDKey); ok { if s, ok := v.(string); ... }`）。后续 Task 中凡引用 `c.Get` 的伪代码/注释均以此为准。
 - sonic/ast 在 Go 1.27 环境降级 encoding/json（仅 WARNING，测试不受影响）。
@@ -635,14 +641,17 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/gospacex/webx/envelope"
-	"go.opentelemetry.io/otel/sdk/trace"
+	otrace "go.opentelemetry.io/otel/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
+// 注：tracer 经 sdktrace provider 构造；service 层 Start 返回 (ctx, span)
+
 // otelTracerForTest 用 InMemoryExporter + Syncer 造真实 Tracer（trace-id 非全 0）
-func otelTracerForTest(t *testing.T, exp *tracetest.InMemoryExporter) trace.Tracer {
+func otelTracerForTest(t *testing.T, exp *tracetest.InMemoryExporter) otrace.Tracer {
 	t.Helper()
-	provider := trace.NewTracerProvider(trace.WithSyncer(exp))
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
 	return provider.Tracer("webx-test")
 }
@@ -725,7 +734,7 @@ import (
 )
 
 func TestDefaultChainOrder(t *testing.T) {
-	tracer := otel.NewTracerProvider().Tracer("webx-test") // noop 即可
+	tracer := otel.GetTracerProvider().Tracer("webx-test") // noop 即可
 	stats := NewAccessStats()
 	chain := DefaultChain(tracer, stats, logx.GetGlobal(), 10, 20, nil, 5*time.Second)
 	if len(chain) != 6 {
@@ -1028,7 +1037,8 @@ import (
 func Otel(tr trace.Tracer) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		name := fmt.Sprintf("%s %s", string(c.Method()), string(c.Path()))
-		span := tr.Start(ctx, name)
+		// v1.29.0 Go SDK: Start 返回 (Context, Span)——ctx 已含活动 span
+		ctx, span := tr.Start(ctx, name)
 		defer span.End()
 		span.SetAttributes(
 			attribute.String("http.method", string(c.Method())),
@@ -1076,7 +1086,7 @@ func Logging(l logx.Logger, stats *AccessStats) app.HandlerFunc {
 			logx.Int("status", c.Response.StatusCode()),
 			logx.Int("duration_ms", int(dur.Milliseconds())),
 			logx.String("request_id", envelope.RequestIDFrom(c)),
-			logx.String("remote", c.RemoteAddr()),
+			logx.String("remote", c.RemoteAddr().String()),
 		)
 	}
 }
@@ -1371,7 +1381,7 @@ func (c *Config) FillDefaults() {
 		c.Logger = logx.GetGlobal()
 	}
 	if c.Tracer == nil {
-		c.Tracer = otel.NewTracerProvider().Tracer("webx") // noop 安全
+		c.Tracer = otel.GetTracerProvider().Tracer("webx") // noop 安全
 	}
 	if c.Stats == nil {
 		c.Stats = middleware.NewAccessStats()
@@ -2004,6 +2014,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
+// 注：tracer 经 sdktrace provider 构造；service 层 Start 返回 (ctx, span)
+
 // fakeRepo 最小假 Repo（接口注入，不用 testify）
 type fakeRepo struct{ orders map[int64]*model.Order; notFound bool }
 
@@ -2021,7 +2033,7 @@ func (f *fakeRepo) List(ctx context.Context) ([]*model.Order, error) { return ni
 
 func TestServiceGetPassthrough(t *testing.T) {
 	repo := &fakeRepo{orders: map[int64]*model.Order{7: {ID: 7, Status: "pending"}}}
-	svc := New(repo, logx.GetGlobal(), otel.NewTracerProvider().Tracer("t"))
+	svc := New(repo, logx.GetGlobal(), otel.GetTracerProvider().Tracer("t"))
 	got, err := svc.Get(context.Background(), 7)
 	if err != nil || got.ID != 7 {
 		t.Fatalf("Get = %+v, %v", got, err)
@@ -2030,7 +2042,7 @@ func TestServiceGetPassthrough(t *testing.T) {
 
 func TestServiceArchivedOrderRejected(t *testing.T) {
 	repo := &fakeRepo{orders: map[int64]*model.Order{8: {ID: 8, Status: "archived"}}}
-	svc := New(repo, logx.GetGlobal(), otel.NewTracerProvider().Tracer("t"))
+	svc := New(repo, logx.GetGlobal(), otel.GetTracerProvider().Tracer("t"))
 	_, err := svc.Get(context.Background(), 8)
 	if e := envelope.As(err); e.Code != CodeOrderArchived {
 		t.Fatalf("code = %d, want %d", e.Code, CodeOrderArchived)
@@ -2045,9 +2057,8 @@ func TestServiceOpensChildSpan(t *testing.T) {
 	repo := &fakeRepo{orders: map[int64]*model.Order{9: {ID: 9, Status: "pending"}}}
 	svc := New(repo, logx.GetGlobal(), tracer)
 
-	// 根 span 下的 ctx 调 service（service 内部开子 span service.GetOrder）
-	root := tracer.Start(context.Background(), "root")
-	rootCtx := trace.ContextWithSpan(context.Background(), root)
+	// 根 span：Start 返回 (ctx 含活动 span, span)（v1.29.0 Go SDK）
+	rootCtx, root := tracer.Start(context.Background(), "root")
 	if _, err := svc.Get(rootCtx, 9); err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -2084,7 +2095,7 @@ import (
 
 // 复用 service 测试的 fakeRepo 思路：此处直接以 nil Svc 测参数校验短路
 func TestLogicRejectsNonPositiveID(t *testing.T) {
-	l := New(nil, logx.GetGlobal(), otel.NewTracerProvider().Tracer("t"))
+	l := New(nil, logx.GetGlobal(), otel.GetTracerProvider().Tracer("t"))
 	_, err := l.Get(context.Background(), 0)
 	if e := envelope.As(err); e.Code != envelope.CodeBadRequest {
 		t.Fatalf("code = %d, want %d", e.Code, envelope.CodeBadRequest)
@@ -2112,7 +2123,7 @@ import (
 )
 
 func TestHandlerRendersEnvelope(t *testing.T) {
-	h := New(nil, logx.GetGlobal(), otel.NewTracerProvider().Tracer("t"))
+	h := New(nil, logx.GetGlobal(), otel.GetTracerProvider().Tracer("t"))
 	hFn := h.GetOrder // app.HandlerFunc
 
 	c := app.NewContext(0)
@@ -2310,7 +2321,7 @@ func New(repo model.OrderRepository, l logx.Logger, tr trace.Tracer) *OrderServi
 
 // Get 取订单；model 错误按码透传；归档订单 → 2001
 func (s *OrderService) Get(ctx context.Context, id int64) (*model.Order, error) {
-	span := s.Tracer.Start(ctx, "service.GetOrder")
+	ctx, span := s.Tracer.Start(ctx, "service.GetOrder")
 	defer span.End()
 	o, err := s.Repo.Get(ctx, id)
 	if err != nil {
@@ -2362,7 +2373,7 @@ func (g *OrderLogic) Get(ctx context.Context, rawID string) (any, error) {
 	if err != nil || id <= 0 {
 		return nil, envelope.Errorf(envelope.CodeBadRequest, "订单 id 非法: %q", rawID)
 	}
-	span := g.Tracer.Start(ctx, "logic.GetOrder")
+	ctx, span := g.Tracer.Start(ctx, "logic.GetOrder")
 	defer span.End()
 	o, err := g.Svc.Get(ctx, id) // Svc 为 nil 时由 handler 前置 fail fast 拦截（1001）
 	if err != nil {
@@ -2433,7 +2444,7 @@ func (h *OrderHandler) GetOrder(ctx context.Context, c *app.RequestContext) {
 		envelope.Render(c, nil, envelope.ErrBadRequest)
 		return
 	}
-	span := h.Tracer.Start(ctx, "handler.GetOrder")
+	ctx, span := h.Tracer.Start(ctx, "handler.GetOrder")
 	defer span.End()
 	data, err := h.Logic.Get(ctx, c.Param("id"))
 	h.L.InfoContext(ctx, "handler.GetOrder: done", logx.String("id", c.Param("id")))
@@ -2446,7 +2457,7 @@ func (h *OrderHandler) List(ctx context.Context, c *app.RequestContext) {
 		envelope.Render(c, nil, envelope.ErrBadRequest)
 		return
 	}
-	span := h.Tracer.Start(ctx, "handler.ListOrders")
+	ctx, span := h.Tracer.Start(ctx, "handler.ListOrders")
 	defer span.End()
 	envelope.Render(c, []any{}, nil) // demo：List 经 logic 预留，此处返回空列表
 }
@@ -2496,7 +2507,7 @@ import (
 // BuildTracer 按开关返回（Tracer, 是否启用调用链）
 func BuildTracer(cfg *config.Config) (trace.Tracer, bool, error) {
 	if !cfg.Trace.Enabled {
-		return otel.NewTracerProvider().Tracer("webx-demo"), false, nil
+		return otel.GetTracerProvider().Tracer("webx-demo"), false, nil
 	}
 	otCfg := logx.OTelConfig{
 		Enabled:     true,
@@ -2678,8 +2689,9 @@ func TestTraceSwitchOnSpanTree(t *testing.T) {
 
 	// 真实链路：webx 默认链 otel 开 root span → 各层子 span（经 TestApp 注册 demo 路由）
 	// 演示：手工组 chain-unit 模拟「root（webx otel 中间件）→ handler.GetOrder 子 span」
-	root := tr.Start(context.Background(), "GET /orders/42")
-	child := tr.Start(trace.ContextWithSpan(context.Background(), root), "handler.GetOrder")
+	rootCtx, root := tr.Start(context.Background(), "GET /orders/42")
+	childCtx, child := tr.Start(rootCtx, "handler.GetOrder")
+	_ = childCtx
 	_ = child.End()
 	_ = root.End()
 	provider.ForceFlush(context.Background())
