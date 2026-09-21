@@ -29,7 +29,7 @@
 - 验证方式：`go test ./middleware/ -v` 全绿
 
 ### Task 4: webx bootstrap 与 health
-- [ ] **任务完成**（与 superpowers plan `Task 4`、`tasks.md` 4.1-4.4 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 4`、`tasks.md` 4.1-4.4 同步勾选）
 - 目标：`App`（内嵌 `*hertz` server）+ `New(opts...)` 选项（Config/WithLogger/WithTLS/WithMiddleware/WithReadyCheck/WithOTLP/WithMetrics）+ 自动挂载 `/healthz/live`、`/healthz/ready`；`webx.App()` 单例缓存 + `webx.TestApp()`（127.0.0.1:0 + `URL()`）；`Shutdown(ctx)` in-flight 排空 + SIGINT/SIGTERM 装配；单测覆盖最小启动/缺省配置/单例同指针/TestApp/优雅停机
 - 改动文件：`webx.go`、`config.go`、`webx_test.go`
 - 验证方式：`go test . -v` 全绿

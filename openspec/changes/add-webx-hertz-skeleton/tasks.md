@@ -16,10 +16,10 @@
 - [x] 3.5 单测：recovery/timeout/ratelimit/cors/otel/logx 各一功能用例 + 链顺序组合用例
 
 ## 4. webx bootstrap
-- [ ] 4.1 `webx.go`：`App`（内嵌 `*hertz.App`）+ `New(opts...)` 选项（Config/WithLogger/WithTLS/WithMiddleware/WithReadyCheck/WithOTLP/WithMetrics）+ health 端点自动挂载（`/healthz/live`、`/healthz/ready`）
-- [ ] 4.2 单例 `webx.App()`（首次默认配置 New 后缓存）+ `TestApp()`（独立实例、127.0.0.1:0 随机端口、`URL()` 取址）
-- [ ] 4.3 优雅停机：`Shutdown(ctx)` 排空 in-flight；SIGINT/SIGTERM 装配示例（cmd 层）
-- [ ] 4.4 单测：最小启动、缺省配置不 panic、单例同一指针、TestApp 随机端口、优雅停机排空
+- [x] 4.1 `webx.go`：`App`（内嵌 `*hertz.App`）+ `New(opts...)` 选项（Config/WithLogger/WithTLS/WithMiddleware/WithReadyCheck/WithOTLP/WithMetrics）+ health 端点自动挂载（`/healthz/live`、`/healthz/ready`）
+- [x] 4.2 单例 `webx.App()`（首次默认配置 New 后缓存）+ `TestApp()`（独立实例、127.0.0.1:0 随机端口、`URL()` 取址）
+- [x] 4.3 优雅停机：`Shutdown(ctx)` 排空 in-flight；SIGINT/SIGTERM 装配示例（cmd 层）
+- [x] 4.4 单测：最小启动、缺省配置不 panic、单例同一指针、TestApp 随机端口、优雅停机排空
 
 ## 5. TLS / OTel
 - [ ] 5.1 `WithTLS` 证书加载 + H2；加载失败 fail fast 返回含路径错误

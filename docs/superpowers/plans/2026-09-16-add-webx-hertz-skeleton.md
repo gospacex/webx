@@ -425,14 +425,14 @@ func Render(c *app.RequestContext, data any, err error) {
 运行：`go test ./envelope/ -v`
 预期：`PASS`，5 个测试全绿。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 git add envelope/
 git commit -m "feat: envelope unified response + segmented error codes (errors.Is, CodeToStatus)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
 
 ---
 
@@ -1164,7 +1164,7 @@ git commit -m "feat: webx middleware chain (recovery/timeout/ratelimit/cors/otel
 - `h.Run()` 阻塞；`h.Spin()`（goroutine Run + SIGHUP/SIGINT/SIGTERM→Shutdown）；`h.IsRunning()`；`h.Shutdown(ctx)`（需 running；OnShutdown 钩子 + standard transporter 排空）；`h.Engine() *route.Engine`；`engine.Handlers app.HandlersChain`（全局链，按序执行）；`engine.GET(path string, handlers ...app.HandlerFunc)`。
 - 测试 HTTP 客户端：`hc, _ := client.NewClient()`（`github.com/cloudwego/hertz/pkg/app/client`）；`code, body, err := pclient.GetURL(ctx, nil, url, hc)`（`github.com/cloudwego/hertz/pkg/protocol/client`，`Doer` 接口 `Do(ctx, *protocol.Request, *protocol.Response) error`，`*client.Client` 满足）。
 
-- [ ] **步骤 1：编写失败测试**
+- [x] **步骤 1：编写失败测试**
 
 创建 `webx_test.go`（module 根，package webx）：
 
@@ -1325,12 +1325,12 @@ func TestWithMiddlewareAppendedAtTail(t *testing.T) {
 }
 ```
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 运行：`go test . -v`
 预期：编译失败（`undefined: New / AppSingleton / TestApp / WithReadyCheck / ...`）——红灯。
 
-- [ ] **步骤 3：实现 `config.go`**
+- [x] **步骤 3：实现 `config.go`**
 
 ```go
 package webx
@@ -1439,7 +1439,7 @@ func WithTracer(tr trace.Tracer) Option {
 }
 ```
 
-- [ ] **步骤 4：实现 `webx.go`**
+- [x] **步骤 4：实现 `webx.go`**
 
 ```go
 package webx
@@ -1639,19 +1639,19 @@ func (a *App) Shutdown(ctx context.Context) error {
 > 2. `h.Engine()` 非 nil 且 `Engine.Handlers` 全局链按序执行（v0.10.6 engine.go 已验证）；`registerHealth` 注册在 New/TestApp 内，路由不挂全局链，**但 health 探针不受业务 WithMiddleware 影响**（符合「探针独立」语义；若需探针也过默认链，改经 `h.Spin()` 前 `h.Use(...)` 追加——当前契约保持独立）。
 > 3. `TestGracefulShutdownDrain` 依赖 standard transporter 的 Shutdown 排空（已验证 `standard.NewTransporter` 支持 `Shutdown(ctx)`）；`Spin()` 未在 TestApp 使用（避免信号 goroutine 与 t.Cleanup 竞争，直接 `go h.Run()`）。
 
-- [ ] **步骤 5：运行测试确认通过**
+- [x] **步骤 5：运行测试确认通过**
 
 运行：`go test . -v`
 预期：全绿（6 个测试）。`go vet .` 无告警。
 
-- [ ] **步骤 6：Commit**
+- [x] **步骤 6：Commit**
 
 ```bash
 git add config.go webx.go webx_test.go
 git commit -m "feat: webx bootstrap (New options, health probes, AppSingleton, TestApp, graceful Shutdown)"
 ```
 
-- [ ] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
+- [x] **Task complete**（本 Task 全部 Step 为 `[x]` 后勾选；与 plan-ready **任务完成**、tasks.md 对应行同步）
 
 ---
 
