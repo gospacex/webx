@@ -187,6 +187,9 @@ func TestApp(opts ...Option) (*App, error) {
 	bindMetrics(&cfg)
 
 	a := &App{Hertz: h, cfg: cfg, ln: ln, stats: cfg.Stats}
+	for _, fn := range cfg.preRun { // 路由注册须早于 Run（路由树只读后并发 Serve）
+		fn(a)
+	}
 	go h.Run()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {

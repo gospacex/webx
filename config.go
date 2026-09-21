@@ -29,8 +29,9 @@ type Config struct {
 	Stats          *middleware.AccessStats
 	MetricsEnabled bool
 	OTEL           logx.OTelConfig // 记录用；TracerProvider 由 cmd 层经 logx 装配
-	MeterProvider  metric.MeterProvider  // Task 5 接线
+	MeterProvider  metric.MeterProvider // Task 5 接线
 	Middlewares    []app.HandlerFunc
+	preRun         []func(*App) // 非导出：TestApp 启动监听前回调（路由注册）
 }
 
 // FillDefaults 对零值字段补齐缺省
@@ -108,4 +109,9 @@ func WithTracer(tr trace.Tracer) Option {
 // WithMeterProvider 注入 otel/metric Provider（MetricsEnabled=true 时 BindMeter，Task 5）
 func WithMeterProvider(p metric.MeterProvider) Option {
 	return func(c *Config) { c.MeterProvider = p }
+}
+
+// WithPreRun 在 TestApp 启动监听前回调（业务路由注册须早于 Run，避免 hertz 路由树并发写）
+func WithPreRun(fn func(a *App)) Option {
+	return func(c *Config) { c.preRun = append(c.preRun, fn) }
 }

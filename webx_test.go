@@ -95,14 +95,15 @@ func TestReadyGate(t *testing.T) {
 }
 
 func TestGracefulShutdownDrain(t *testing.T) {
-	a, err := TestApp()
+	a, err := TestApp(WithPreRun(func(a *App) { // 路由注册须早于监听（避免路由树并发读写 race）
+		a.Engine.GET("/sleep", func(ctx context.Context, c *app.RequestContext) {
+			time.Sleep(300 * time.Millisecond)
+			c.JSON(200, "done")
+		})
+	}))
 	if err != nil {
 		t.Fatalf("TestApp: %v", err)
 	}
-	a.Engine.GET("/sleep", func(ctx context.Context, c *app.RequestContext) {
-		time.Sleep(300 * time.Millisecond)
-		c.JSON(200, "done")
-	})
 	done := make(chan int, 1)
 	go func() {
 		code, _, err := getURL(t, a.URL()+"/sleep")
