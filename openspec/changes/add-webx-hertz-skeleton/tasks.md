@@ -5,8 +5,8 @@
 - [x] 1.2 依赖锁定：`github.com/cloudwego/hertz`（版本对齐 protocolx/http 的 v0.10.x）、`go.opentelemetry.io/otel`、`google/uuid`；确认 `go build` 通过且依赖树无 `net/http` 服务端路径 <!-- 已实现: hertz v0.10.6 + otel v1.29.0 族 + 本地 logx/configx replace，构建通过 -->
 
 ## 2. envelope（统一响应 + 错误码）
-- [ ] 2.1 `envelope/envelope.go`：`Response{Code, Message, Data, RequestID}` + `Render(c *app.RequestContext, data any, err error)`；`envelope.Error`（code+message，实现 error 与 Is）+ 分段错误码常量（1xxx/2xxx/4xxx/5xxx）+ `CodeToStatus` HTTP 映射表
-- [ ] 2.2 单测：成功/失败渲染、`errors.Is` 判定、错误码表完整性（表驱动）
+- [x] 2.1 `envelope/envelope.go`：`Response{Code, Message, Data, RequestID}` + `Render(c *app.RequestContext, data any, err error)`；`envelope.Error`（code+message，实现 error 与 Is）+ 分段错误码常量（1xxx/2xxx/4xxx/5xxx）+ `CodeToStatus` HTTP 映射表
+- [x] 2.2 单测：成功/失败渲染、`errors.Is` 判定、错误码表完整性（表驱动） <!-- 已实现: envelope/codes.go+envelope.go 全绿 -->
 
 ## 3. 中间件链
 - [ ] 3.1 `middleware/recovery.go` + `middleware/timeout.go`：panic→5001/500、超时→5002/504，错误路径打 logx 日志

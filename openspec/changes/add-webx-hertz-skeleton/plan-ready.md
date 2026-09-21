@@ -17,7 +17,7 @@
 - 验证方式：`go build ./...` 通过；`go mod graph | grep "net/http"` 无服务端栈
 
 ### Task 2: envelope 统一响应与错误码
-- [ ] **任务完成**（与 superpowers plan `Task 2`、`tasks.md` 2.1/2.2 同步勾选）
+- [x] **任务完成**（与 superpowers plan `Task 2`、`tasks.md` 2.1/2.2 同步勾选）
 - 目标：`envelope.Response{Code,Message,Data,RequestID}` + `Render(c, data, err)`；`*Err`（code+msg，实现 error/Is）+ 分段错误码常量（1xxx/2xxx/4xxx/5xxx）+ `CodeToStatus` 映射；表驱动单测覆盖渲染、errors.Is、码表完整性
 - 改动文件：`envelope/envelope.go`、`envelope/codes.go`、`envelope/envelope_test.go`
 - 验证方式：`go test ./envelope/ -v` 全绿

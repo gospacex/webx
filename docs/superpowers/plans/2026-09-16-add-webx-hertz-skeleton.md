@@ -59,6 +59,10 @@
 - ❌ `c.RequestCtx()`（RequestContext 无此方法）→ ✅ 测试用 `ctx := app.NewContext(0)`；生产链路里 hertz 会 `ServeHTTP(c context.Context, ctx *app.RequestContext)` 直接传入。
 - ❌ 把 `*app.RequestContext` 当 `context.Context` 用（它只有 `Value`，无 `Deadline/Done/Err`）→ ✅ request-id 经 hertz 的 `c.Set(key,val)` / `c.Get(key)`（`ctx.Keys` map）流转，不引入 std context。
 
+**Task 2 落地追加实测（v0.10.6）：**
+- `c.Get(key)` 返回**双值** `(any, bool)`（非 `c.Get(key).(string)` 单值形式）——`envelope.RequestIDFrom` 已按双值写法实现（`if v, ok := c.Get(requestIDKey); ok { if s, ok := v.(string); ... }`）。后续 Task 中凡引用 `c.Get` 的伪代码/注释均以此为准。
+- sonic/ast 在 Go 1.27 环境降级 encoding/json（仅 WARNING，测试不受影响）。
+
 因此 `envelope` 的 request-id API 校正为作用于 `*app.RequestContext`：
 - `envelope.WithRequestID(c *app.RequestContext, id string)`（`c.Set`）
 - `envelope.RequestIDFrom(c *app.RequestContext) string`（`c.Get`，缺省生成 uuid）
@@ -141,7 +145,7 @@ git commit -m "chore: scaffold github.com/gospacex/webx module (hertz v0.10.6 + 
 - 创建：`envelope/codes.go`、`envelope/envelope.go`
 - 测试：`envelope/envelope_test.go`
 
-- [ ] **步骤 1：编写失败测试（表驱动）**
+- [x] **步骤 1：编写失败测试（表驱动）**
 
 创建 `envelope/envelope_test.go`：
 
@@ -239,12 +243,12 @@ func TestRegisterCode(t *testing.T) {
 }
 ```
 
-- [ ] **步骤 2：运行测试确认失败**
+- [x] **步骤 2：运行测试确认失败**
 
 运行：`go test ./envelope/ -v`
 预期：编译失败（`undefined: Response / Render / CodeNotFound / ...`）——红灯。
 
-- [ ] **步骤 3：实现 `envelope/codes.go`**
+- [x] **步骤 3：实现 `envelope/codes.go`**
 
 ```go
 package envelope
@@ -308,7 +312,7 @@ func StatusOf(code int) int {
 }
 ```
 
-- [ ] **步骤 4：实现 `envelope/envelope.go`**
+- [x] **步骤 4：实现 `envelope/envelope.go`**
 
 ```go
 package envelope
@@ -410,7 +414,7 @@ func Render(c *app.RequestContext, data any, err error) {
 }
 ```
 
-- [ ] **步骤 5：运行测试确认通过**
+- [x] **步骤 5：运行测试确认通过**
 
 运行：`go test ./envelope/ -v`
 预期：`PASS`，5 个测试全绿。
