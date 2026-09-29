@@ -13,14 +13,24 @@ import (
 	pclient "github.com/cloudwego/hertz/pkg/protocol/client" // 别名：与 app/client 同包名 client，避免冲突
 )
 
-// getURL 测试内 HTTP 请求（hertz 官方客户端，不用 net/http）
-func getURL(t *testing.T, url string) (int, []byte, error) {
-	t.Helper()
+// getURLRaw 测试内 HTTP 请求（hertz 官方客户端，不用 net/http）；
+// 不持有 *testing.T，可供非主 goroutine 调用
+func getURLRaw(url string) (int, []byte, error) {
 	hc, err := client.NewClient()
 	if err != nil {
-		t.Fatalf("NewClient: %v", err)
+		return 0, nil, err
 	}
 	return pclient.GetURL(context.Background(), nil, url, hc)
+}
+
+// getURL 测试内 HTTP 请求（主 goroutine 专用）
+func getURL(t *testing.T, url string) (int, []byte, error) {
+	t.Helper()
+	code, body, err := getURLRaw(url)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	return code, body, nil
 }
 
 func TestNewDefaultsNoPanic(t *testing.T) {
@@ -48,7 +58,10 @@ func TestAppSingletonSamePointer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppSingleton: %v", err)
 	}
-	a2, _ := AppSingleton()
+	a2, err := AppSingleton()
+	if err != nil {
+		t.Fatalf("AppSingleton: %v", err)
+	}
 	if a1 != a2 {
 		t.Fatal("AppSingleton returned different pointers")
 	}
@@ -84,19 +97,27 @@ func TestReadyGate(t *testing.T) {
 	t.Cleanup(func() {
 		_ = a.Shutdown(context.Background())
 	})
-	liveCode, _, _ := getURL(t, a.URL()+"/healthz/live")
+	liveCode, _, err := getURLRaw(a.URL() + "/healthz/live")
+	if err != nil {
+		t.Fatalf("GET live: %v", err)
+	}
 	if liveCode != 200 {
 		t.Fatalf("live = %d, want 200", liveCode)
 	}
-	readyCode, readyBody, _ := getURL(t, a.URL()+"/healthz/ready")
+	readyCode, readyBody, err := getURLRaw(a.URL() + "/healthz/ready")
+	if err != nil {
+		t.Fatalf("GET ready: %v", err)
+	}
 	if readyCode != 503 || !strings.Contains(string(readyBody), "unavailable") {
 		t.Fatalf("ready = %d %s, want 503 unavailable", readyCode, readyBody)
 	}
 }
 
 func TestGracefulShutdownDrain(t *testing.T) {
+	entered := make(chan struct{})
 	a, err := TestApp(WithPreRun(func(a *App) { // 路由注册须早于监听（避免路由树并发读写 race）
 		a.Engine.GET("/sleep", func(ctx context.Context, c *app.RequestContext) {
+			close(entered) // 请求进入 handler 即通知主线程，替代盲等 sleep
 			time.Sleep(300 * time.Millisecond)
 			c.JSON(200, "done")
 		})
@@ -106,15 +127,15 @@ func TestGracefulShutdownDrain(t *testing.T) {
 	}
 	done := make(chan int, 1)
 	go func() {
-		code, _, err := getURL(t, a.URL()+"/sleep")
+		code, _, err := getURLRaw(a.URL() + "/sleep") // 子 goroutine 只回传结果，断言留主线程
 		if err != nil {
-			done <- 0
+			done <- -1
 			return
 		}
 		done <- code
 	}()
-	// 等待请求入链（handler 300ms 睡眠）后再停机，保证排空的是真实 in-flight 请求
-	time.Sleep(150 * time.Millisecond)
+	// 等待请求真正进入 handler（in-flight）后再停机，保证排空的是真实 in-flight 请求
+	<-entered
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := a.Shutdown(ctx); err != nil {

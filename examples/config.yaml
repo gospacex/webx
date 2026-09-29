@@ -2,5 +2,6 @@ demo:
   biz:
     timeout_ms: 3000
   trace:
-    enabled: false   # 调用链开关（默认关闭；开启后分层路由入链，经 logx 实现）
-    exporter: stdout
+    enabled: true    # 调用链开关（开启后分层路由入链，经 logx 实现）
+    exporter: otlp   # stdout / jaeger / otlp
+    endpoint: http://localhost:4318  # OTLP HTTP 端点（本地 Jaeger）

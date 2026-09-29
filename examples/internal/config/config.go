@@ -12,6 +12,7 @@ type Biz struct {
 type Trace struct {
 	Enabled  bool   `mapstructure:"enabled"`
 	Exporter string `mapstructure:"exporter"` // stdout / jaeger / otlp
+	Endpoint string `mapstructure:"endpoint"` // OTLP HTTP 端点（exporter=otlp 时生效），如 http://localhost:4318
 }
 
 // Config 示例工程配置
@@ -24,6 +25,9 @@ type Config struct {
 func (c *Config) FillDefaults() {
 	if c.Trace.Exporter == "" {
 		c.Trace.Exporter = "stdout"
+	}
+	if c.Trace.Endpoint == "" {
+		c.Trace.Endpoint = "http://localhost:4318"
 	}
 }
 

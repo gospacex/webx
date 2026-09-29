@@ -20,6 +20,9 @@ func BuildTracer(cfg *config.Config) (trace.Tracer, bool, error) {
 		Enabled:     true,
 		Exporter:    cfg.Trace.Exporter,
 		ServiceName: "webx-demo",
+		OTLP: logx.OTLPConfig{
+			Endpoint: cfg.Trace.Endpoint, // 如 http://localhost:4318
+		},
 	}
 	if _, err := logxzap.SetupTracerProvider(otCfg); err != nil {
 		return nil, false, err

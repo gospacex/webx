@@ -1,7 +1,6 @@
 package envelope
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -74,5 +73,4 @@ func TestRequestIDFromWriteBack(t *testing.T) {
 	if RequestIDFrom(c) == rid1 {
 		t.Fatal("empty stored id should regenerate, got same")
 	}
-	_ = context.Background()
 }

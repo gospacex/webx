@@ -38,6 +38,9 @@ func main() {
 		OTel: logx.OTelConfig{
 			Enabled:  cfg.Trace.Enabled, // 调用链开关 → logx 入链（日志挂 span event + trace_id）
 			Exporter: cfg.Trace.Exporter,
+			OTLP: logx.OTLPConfig{ // otlp exporter 目标（exporter=stdout/jaeger 时忽略）
+				Endpoint: cfg.Trace.Endpoint,
+			},
 		},
 	})
 	if err != nil {

@@ -64,32 +64,46 @@ func (s *AccessStats) Record(ctx context.Context, status int, dur time.Duration)
 	}
 }
 
-// MetricsBound instrument 是否已接线（测试断言用）
-func (s *AccessStats) MetricsBound() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.reqCounter != nil
-}
-
-// BindMeter 由 webx 根包（Task 5）在 Meter 可用时接线 instrument
+// BindMeter 由 webx 根包（Task 5）在 Meter 可用时接线 instrument。
+// all-or-none：先建局部 instrument，全部成功后一次性提交——
+// 部分失败不留下半接线状态（否则 reqCounter 已接而代码统计缺失，
+// 却仍被 MetricsBound 报 true）。已接线时重绑定幂等：不重建、不报错。
 func (s *AccessStats) BindMeter(meter metric.Meter) error {
-	var err error
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.reqCounter == nil {
-		s.reqCounter, err = meter.Int64Counter("webx.requests",
-			metric.WithDescription("total requests"),
-			metric.WithUnit("{request}"))
+	if s.MetricsBoundLocked() {
+		return nil
 	}
-	if err == nil && s.codeCounter == nil {
-		s.codeCounter, err = meter.Int64Counter("webx.responses_by_code",
+	reqCounter, err := meter.Int64Counter("webx.requests",
+		metric.WithDescription("total requests"),
+		metric.WithUnit("{request}"))
+	var codeCounter metric.Int64Counter
+	if err == nil {
+		codeCounter, err = meter.Int64Counter("webx.responses_by_code",
 			metric.WithDescription("responses by http status code"),
 			metric.WithUnit("{response}"))
 	}
-	if err == nil && s.durHist == nil {
-		s.durHist, err = meter.Float64Histogram("webx.request.duration",
+	var durHist metric.Float64Histogram
+	if err == nil {
+		durHist, err = meter.Float64Histogram("webx.request.duration",
 			metric.WithDescription("request duration seconds"),
 			metric.WithUnit("s"))
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	s.reqCounter, s.codeCounter, s.durHist = reqCounter, codeCounter, durHist
+	return nil
+}
+
+// MetricsBoundLocked instrument 是否全部接线（调用方须持有 mu）
+func (s *AccessStats) MetricsBoundLocked() bool {
+	return s.reqCounter != nil && s.codeCounter != nil && s.durHist != nil
+}
+
+// MetricsBound instrument 是否全部接线（测试断言用）
+func (s *AccessStats) MetricsBound() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.MetricsBoundLocked()
 }

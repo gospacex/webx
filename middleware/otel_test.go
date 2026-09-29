@@ -7,9 +7,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/gospacex/webx/envelope"
-	otrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	otrace "go.opentelemetry.io/otel/trace"
 )
 
 // otelTracerForTest 用 InMemoryExporter + Syncer 造真实 Tracer（trace-id 非全 0）
@@ -83,5 +84,70 @@ func TestOtelSeedsInboundRequestID(t *testing.T) {
 	c2 := runOtelChain(t, tr, "not-a-trace-id")
 	if got := string(c2.Response.Header.Peek("X-Request-Id")); got == "not-a-trace-id" || len(got) != 32 {
 		t.Fatalf("invalid inbound: X-Request-Id = %q, want server-generated 32-hex", got)
+	}
+}
+
+// runOtelStatusChain 跑一条「otel → status handler」的 chain，handler 写入响应码
+func runOtelStatusChain(t *testing.T, tr otrace.Tracer, status int) *app.RequestContext {
+	t.Helper()
+	c := app.NewContext(0)
+	c.Request.SetMethod("GET")
+	c.Request.SetRequestURI("/demo/42")
+	c.SetHandlers(app.HandlersChain{Otel(tr), func(ctx context.Context, c *app.RequestContext) {
+		c.Response.SetStatusCode(status)
+	}})
+	c.Next(context.Background())
+	return c
+}
+
+func TestOtelSpanStatusOnServerError(t *testing.T) {
+	exp := tracetest.NewInMemoryExporter()
+	tr := otelTracerForTest(t, exp)
+
+	// 500 → span 标 Error；200 → 保持 Unset
+	runOtelStatusChain(t, tr, 500)
+	runOtelStatusChain(t, tr, 200)
+
+	snap := exp.GetSpans()
+	if len(snap) != 2 {
+		t.Fatalf("spans = %d, want 2", len(snap))
+	}
+	if snap[0].Status.Code != codes.Error {
+		t.Fatalf("5xx span status = %+v, want Error", snap[0].Status.Code)
+	}
+	if snap[1].Status.Code != codes.Unset {
+		t.Fatalf("2xx span status = %+v, want Unset", snap[1].Status.Code)
+	}
+}
+
+func TestOtelPanicMarksSpanErrorAndRepanics(t *testing.T) {
+	exp := tracetest.NewInMemoryExporter()
+	tr := otelTracerForTest(t, exp)
+
+	c := app.NewContext(0)
+	c.Request.SetMethod("GET")
+	c.Request.SetRequestURI("/demo/42")
+	c.SetHandlers(app.HandlersChain{Otel(tr), func(ctx context.Context, c *app.RequestContext) {
+		panic("boom")
+	}})
+
+	var repanned any
+	func() {
+		defer func() {
+			repanned = recover()
+		}()
+		c.Next(context.Background())
+	}()
+	if repanned == nil || repanned.(string) != "boom" {
+		t.Fatalf("panic not rethrown through middleware (got %v)", repanned)
+	}
+
+	// 同步 exporter：span.End 先于 defer 链展开完成，span 已导出且标 Error
+	snap := exp.GetSpans()
+	if len(snap) != 1 {
+		t.Fatalf("spans = %d, want 1 (span.End fired before repanic)", len(snap))
+	}
+	if snap[0].Status.Code != codes.Error {
+		t.Fatalf("panic span status = %+v, want Error", snap[0].Status.Code)
 	}
 }

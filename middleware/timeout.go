@@ -16,7 +16,7 @@ func Timeout(d time.Duration, l logx.Logger) app.HandlerFunc {
 		if d <= 0 {
 			l.WarnContext(ctx, "request timed out before dispatch (zero budget)",
 				logx.String("path", string(c.FullPath())))
-			c.Abort() // 停链：hertz engine 按 IsAborted 提前终止后续 handler
+			c.Abort()                                    // 停链：hertz engine 按 IsAborted 提前终止后续 handler
 			envelope.Render(c, nil, envelope.ErrTimeout) // code 5002 → 504
 			return
 		}

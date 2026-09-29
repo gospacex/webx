@@ -72,10 +72,43 @@ func TestErrorsIs(t *testing.T) {
 	}
 }
 
+// As 归一非 envelope 错误时不得泄露原始错误文案（内部 IP/路径/驱动细节不进 Message）
+func TestAsDoesNotLeakInternalDetails(t *testing.T) {
+	raw := errors.New("dial tcp 10.0.0.7:3306: connection refused")
+	e := As(raw)
+	if e.Code != CodeInternal {
+		t.Fatalf("As(plain) code = %d, want %d", e.Code, CodeInternal)
+	}
+	if e.Message != codeNames[CodeInternal] {
+		t.Fatalf("As(plain) message = %q, want %q", e.Message, codeNames[CodeInternal])
+	}
+	if strings.Contains(e.Message, "10.0.0.7") {
+		t.Fatalf("As(plain) message leaks internal detail: %q", e.Message)
+	}
+
+	// 端到端：Render 序列化到响应体的内容也不含原始文案
+	c := newTestContext("rid-42")
+	Render(c, nil, raw)
+	if got := c.Response.StatusCode(); got != consts.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", got)
+	}
+	body := string(c.Response.Body())
+	if strings.Contains(body, "10.0.0.7") || strings.Contains(body, "connection refused") {
+		t.Fatalf("response body leaks internal detail: %s", body)
+	}
+	var r Response
+	if err := json.Unmarshal(c.Response.Body(), &r); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if r.Message != "internal server error" {
+		t.Fatalf("response message = %q, want %q", r.Message, "internal server error")
+	}
+}
+
 func TestCodeTableComplete(t *testing.T) {
-	for code, name := range CodeNames {
-		if _, ok := CodeToStatus[code]; !ok {
-			t.Errorf("CodeToStatus missing preset code %d (%s)", code, name)
+	for code, name := range codeNames {
+		if _, ok := codeToStatus[code]; !ok {
+			t.Errorf("codeToStatus missing preset code %d (%s)", code, name)
 		}
 		if StatusOf(code) == 0 {
 			t.Errorf("StatusOf(%d) = 0, want mapped status", code)
@@ -87,5 +120,29 @@ func TestRegisterCode(t *testing.T) {
 	RegisterCode(2001, 404)
 	if got := StatusOf(2001); got != 404 {
 		t.Fatalf("StatusOf(2001) = %d, want 404", got)
+	}
+}
+
+func TestRegisterCodeInvalidPanics(t *testing.T) {
+	cases := []struct {
+		name       string
+		code       int
+		httpStatus int
+	}{
+		{"code 低于业务扩展段", 1001, 400},
+		{"code 高于业务扩展段", 3000, 400},
+		{"覆盖预置码 CodeBizRule", CodeBizRule, 404},
+		{"httpStatus 过低", 2002, 99},
+		{"httpStatus 过高", 2002, 600},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Fatalf("RegisterCode(%d, %d) 未 panic", tc.code, tc.httpStatus)
+				}
+			}()
+			RegisterCode(tc.code, tc.httpStatus)
+		})
 	}
 }

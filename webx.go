@@ -27,30 +27,57 @@ type App struct {
 	stats *middleware.AccessStats
 }
 
-// New 按选项装配默认链 + health + TLS；不监听（监听由 Run 或 TestApp 触发）
+// New 按选项装配默认链 + health + TLS；不监听（监听由 Run 或 TestApp 触发）。
+// WithPreRun 回调在装配阶段（New 内）执行，用于注册业务路由——此时路由树尚未对外服务，无并发写风险。
 func New(opts ...Option) (*App, error) {
+	cfg, err := newConfig(opts)
+	if err != nil {
+		return nil, err
+	}
+	app, err := assemble(&cfg, nil)
+	if err != nil {
+		return nil, err
+	}
+	return app, nil
+}
+
+// newConfig 应用选项 + FillDefaults + Validate
+func newConfig(opts []Option) (Config, error) {
 	cfg := Config{}
 	for _, o := range opts {
 		o(&cfg)
 	}
 	cfg.FillDefaults()
+	if err := cfg.Validate(); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
 
-	srvOpts, err := buildServerOptions(&cfg, nil)
+// assemble 公共装配：server.New → 默认链/业务中间件 → health → metrics → preRun 回调。
+// ln 非 nil（TestApp）时走 listener 分支。
+func assemble(cfg *Config, ln net.Listener) (*App, error) {
+	srvOpts, err := buildServerOptions(cfg, ln)
 	if err != nil {
 		return nil, err
 	}
 	h := server.New(srvOpts...)
 
-	// 默认链 → 业务中间件追加链尾（3.4）
+	// 默认链（健康探针前缀限流豁免）→ 业务中间件追加链尾（3.4）
 	h.Engine.Handlers = append(
 		middleware.DefaultChain(cfg.Tracer, cfg.Stats, cfg.Logger,
-			cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.CORSOrigins, cfg.Timeout),
+			cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.CORSOrigins, cfg.Timeout,
+			cfg.HealthPrefix),
 		cfg.Middlewares...,
 	)
-	registerHealth(h.Engine, &cfg)
-	bindMetrics(&cfg)
+	registerHealth(h.Engine, cfg)
+	bindMetrics(cfg)
 
-	return &App{Hertz: h, cfg: cfg, stats: cfg.Stats}, nil
+	a := &App{Hertz: h, cfg: *cfg, ln: ln, stats: cfg.Stats}
+	for _, fn := range cfg.preRun { // 路由注册须早于 Run（路由树只读后并发 Serve）
+		fn(a)
+	}
+	return a, nil
 }
 
 // buildServerOptions 组装 hertz options；ln 非 nil（TestApp）时走 listener 分支。
@@ -97,7 +124,7 @@ func loadTLSCfg(cfg *Config) (*tls.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("webx: load TLS cert/key (%s, %s): %w", cfg.TLSCertFile, cfg.TLSKeyFile, err)
 	}
-	return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
+	return &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}, nil
 }
 
 // registerHealth /healthz/live + /healthz/ready
@@ -160,45 +187,48 @@ func AppSingleton() (*App, error) {
 	return singletonApp, singletonErr
 }
 
-// TestApp 独立实例：127.0.0.1:0 随机端口 + 后台 Run + 等待 IsRunning（3s 超时）
+// TestApp 独立实例：127.0.0.1:0 随机端口 + 后台 Run + 等待 IsRunning（3s 超时）。
+// 失败路径先 Shutdown 再 Close listener，避免 goroutine / fd 泄漏。
 func TestApp(opts ...Option) (*App, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("webx: test listen: %w", err)
 	}
-	cfg := Config{}
-	for _, o := range opts {
-		o(&cfg)
-	}
-	cfg.FillDefaults()
-
-	srvOpts, err := buildServerOptions(&cfg, ln)
+	cfg, err := newConfig(opts)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
 	}
-	h := server.New(srvOpts...)
-	h.Engine.Handlers = append(
-		middleware.DefaultChain(cfg.Tracer, cfg.Stats, cfg.Logger,
-			cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.CORSOrigins, cfg.Timeout),
-		cfg.Middlewares...,
-	)
-	registerHealth(h.Engine, &cfg)
-	bindMetrics(&cfg)
 
-	a := &App{Hertz: h, cfg: cfg, ln: ln, stats: cfg.Stats}
-	for _, fn := range cfg.preRun { // 路由注册须早于 Run（路由树只读后并发 Serve）
-		fn(a)
+	a, err := assemble(&cfg, ln)
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
 	}
-	go h.Run()
+
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- a.Hertz.Run()
+	}()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if h.IsRunning() {
+		if a.IsRunning() {
 			return a, nil
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	return nil, errors.New("webx: test server not running after 3s")
+	// 超时：排空监听中（如有）的 in-flight 请求后关闭 listener，
+	// 成功路径不关 listener——hertz 持有（WithListener），由 Shutdown 负责。
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	_ = a.Shutdown(ctx)
+	cancel()
+	_ = ln.Close()
+	select {
+	case err := <-runErr:
+		return nil, fmt.Errorf("webx: test server exited: %w", err)
+	default:
+		return nil, errors.New("webx: test server not running after 3s")
+	}
 }
 
 // Run 阻塞监听（生产入口）

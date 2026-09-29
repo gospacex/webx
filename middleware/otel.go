@@ -22,17 +22,30 @@ func Otel(tr trace.Tracer) app.HandlerFunc {
 		// v1.29.0 Go SDK: Start 返回 (Context, Span)——ctx 含活动 span
 		ctx, span := tr.Start(ctx, name)
 		defer span.End()
+		// panic 展开时（Recovery 在外层尚未渲染）最终状态码仍是 200，
+		// 用 recover 探测展开状态：标 Error 后原样 re-panic（panic 值在此层拿不到）
+		defer func() {
+			if r := recover(); r != nil {
+				span.SetStatus(codes.Error, "panic")
+				panic(r)
+			}
+			if c.Response.StatusCode() >= 500 {
+				span.SetStatus(codes.Error, "server error")
+			}
+		}()
+		// http.route 按 OTel semconv 用路由模板；404 未命中路由时回退原始 path
+		route := string(c.FullPath())
+		if len(route) == 0 {
+			route = string(c.Path())
+		}
 		span.SetAttributes(
 			attribute.String("http.method", string(c.Method())),
-			attribute.String("http.target", string(c.FullPath())),
+			attribute.String("http.route", string(route)),
 		)
 		rid := span.SpanContext().TraceID().String()
 		envelope.WithRequestID(c, rid)
 		c.Response.Header.Set("X-Request-Id", rid)
 		c.Next(ctx)
-		if c.Response.StatusCode() >= 500 {
-			span.SetStatus(codes.Error, "server error")
-		}
 	}
 }
 
