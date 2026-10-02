@@ -3,11 +3,14 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/gospacex/webx/envelope"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -16,6 +19,10 @@ import (
 // envelope.WithRequestID 写入 hertz ctx，并回写 `X-Request-Id` 响应头。
 func Otel(tr trace.Tracer) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
+		// 入站 W3C 续链：gateway/上游经传播器注入的 traceparent/tracestate/baggage
+		// 先 Extract 挂到上游 trace 下；无这些头时行为不变（走下方 X-Request-Id
+		// 种子或 SDK 新生成）。Extract 只读不写，幂等无副作用。
+		ctx = otel.GetTextMapPropagator().Extract(ctx, extractCarrier(c))
 		// 入站 X-Request-Id → 远程 span 种子（规格：客户端带头时贯穿，无头由服务端生成）
 		ctx = seedInboundRequestID(ctx, c)
 		name := fmt.Sprintf("%s %s", string(c.Method()), string(c.Path()))
@@ -47,6 +54,19 @@ func Otel(tr trace.Tracer) app.HandlerFunc {
 		c.Response.Header.Set("X-Request-Id", rid)
 		c.Next(ctx)
 	}
+}
+
+// extractCarrier 收集入站请求中与分布式追踪相关的头（大小写不敏感归一为小写键，
+// 与 Composite(TraceContext,Baggage) 传播器的 Get 行为对齐）。
+func extractCarrier(c *app.RequestContext) propagation.MapCarrier {
+	carrier := propagation.MapCarrier{}
+	c.Request.Header.VisitAll(func(k, v []byte) {
+		switch strings.ToLower(string(k)) {
+		case "traceparent", "tracestate", "baggage":
+			carrier[strings.ToLower(string(k))] = string(v)
+		}
+	})
+	return carrier
 }
 
 // seedInboundRequestID 读入站 X-Request-Id：合法 32-hex trace-id 时构造 remote
