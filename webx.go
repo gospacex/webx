@@ -11,6 +11,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/cloudwego/hertz/pkg/common/adaptor"
 	"github.com/cloudwego/hertz/pkg/common/config"
 	"github.com/cloudwego/hertz/pkg/network/standard"
 	"github.com/cloudwego/hertz/pkg/route"
@@ -63,14 +64,19 @@ func assemble(cfg *Config, ln net.Listener) (*App, error) {
 	}
 	h := server.New(srvOpts...)
 
-	// 默认链（健康探针前缀限流豁免）→ 业务中间件追加链尾（3.4）
+	// 默认链（健康探针/指标采集口前缀限流豁免）→ 业务中间件追加链尾（3.4）
+	exempt := []string{cfg.HealthPrefix}
+	if cfg.MetricsHandler != nil {
+		exempt = append(exempt, cfg.MetricsPrefix)
+	}
 	h.Engine.Handlers = append(
 		middleware.DefaultChain(cfg.Tracer, cfg.Stats, cfg.Logger,
 			cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.CORSOrigins, cfg.Timeout,
-			cfg.HealthPrefix),
+			exempt...),
 		cfg.Middlewares...,
 	)
 	registerHealth(h.Engine, cfg)
+	registerMetrics(h.Engine, cfg)
 	bindMetrics(cfg)
 
 	a := &App{Hertz: h, cfg: *cfg, ln: ln, stats: cfg.Stats}
@@ -139,6 +145,20 @@ func registerHealth(e *route.Engine, cfg *Config) {
 		}
 		c.JSON(503, map[string]any{"status": "unavailable"})
 	})
+}
+
+// registerMetrics 把装配方给的采集口挂到 MetricsPrefix。
+//
+// 未提供 handler 时不做任何事（presence-based）—— 不注册空路由，也不报错：
+// 「不要指标」是合法形态，不该让启动失败。
+//
+// 用 hertz 官方 adaptor 桥接 stdlib 的 http.Handler：采集器生态（promhttp /
+// expvar / pprof）都是 http.Handler，自造桥接必然在 Flush / Hijack 上出错。
+func registerMetrics(e *route.Engine, cfg *Config) {
+	if cfg.MetricsHandler == nil {
+		return
+	}
+	e.GET(cfg.MetricsPrefix, adaptor.HertzHandler(cfg.MetricsHandler))
 }
 
 // bindMetrics MetricsEnabled 时接线 otel/metric instrument（失败仅告警，不阻断服务）

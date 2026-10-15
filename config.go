@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gospacex/traceflag"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,13 @@ type Config struct {
 	RateLimitBurst int
 	CORSOrigins    []string
 	HealthPrefix   string
+	MetricsPrefix  string
+	// MetricsHandler 非空即在 MetricsPrefix 注册该采集口（presence-based）。
+	//
+	// webx 不产指标、也不自带 Prometheus 依赖：它只提供「把装配方给的
+	// http.Handler 挂到引擎上」这一点粘合（业务侧库代码直引 hertz 会违反
+	// 依赖面守卫，故注册动作只能发生在这里）。
+	MetricsHandler http.Handler
 	ReadyCheck     func(context.Context) error
 	Tracer         trace.Tracer
 	Stats          *middleware.AccessStats
@@ -49,6 +57,9 @@ func (c *Config) FillDefaults() {
 	}
 	if c.HealthPrefix == "" {
 		c.HealthPrefix = "/healthz"
+	}
+	if c.MetricsPrefix == "" {
+		c.MetricsPrefix = DefaultMetricsPrefix
 	}
 	if c.Logger == nil {
 		c.Logger = logx.GetGlobal()
@@ -148,6 +159,31 @@ func WithTracer(tr trace.Tracer) Option {
 // WithMeterProvider 注入 otel/metric Provider（MetricsEnabled=true 时 BindMeter，Task 5）
 func WithMeterProvider(p metric.MeterProvider) Option {
 	return func(c *Config) { c.MeterProvider = p }
+}
+
+// DefaultMetricsPrefix 指标采集口缺省路径。
+const DefaultMetricsPrefix = "/metrics"
+
+// WithMetricsEndpoint 把装配方提供的采集口挂到 MetricsPrefix。
+//
+// handler 为 nil 时等于没配（不注册路由、不占路径）。注册的路由会**豁免入口限流**
+// —— 采集器按固定周期拉取，被限流拒掉的表现是「面板数据莫名其妙缺一段」，
+// 而且完全不报错。
+func WithMetricsEndpoint(handler http.Handler) Option {
+	return func(c *Config) {
+		if handler != nil {
+			c.MetricsHandler = handler
+		}
+	}
+}
+
+// WithMetricsPrefix 覆盖指标采集口的路径（缺省 /metrics）。空串视为不改。
+func WithMetricsPrefix(prefix string) Option {
+	return func(c *Config) {
+		if p := strings.TrimSpace(prefix); p != "" {
+			c.MetricsPrefix = p
+		}
+	}
 }
 
 // WithPreRun 在 New / TestApp 启动监听前回调（业务路由注册须早于 Run，避免 hertz 路由树并发写）

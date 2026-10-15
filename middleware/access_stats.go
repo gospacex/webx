@@ -26,6 +26,16 @@ type AccessStats struct {
 // NewAccessStats 创建未接线的 AccessStats
 func NewAccessStats() *AccessStats { return &AccessStats{} }
 
+// durationBucketBounds 耗时分桶（单位：秒）。
+//
+// **必须显式给**：OTel SDK 的缺省分桶是 [0, 5, 10, 25, ..., 10000]，那是**毫秒**
+// 形状的数值，而本直方图声明的单位是 `s`。错配的后果不是报错而是**分桶全废** ——
+// 请求耗时几乎全落在 `le="5"` 这一档，等于只有一个桶，快慢与 p99 都读不出来。
+// 取值按 HTTP 请求的现实量级铺：亚毫秒到 5 秒，10 秒封顶。
+var durationBucketBounds = []float64{
+	0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+}
+
 // Snapshot 线程安全快照（测试断言用）
 type StatsSnapshot struct {
 	Requests   int64
@@ -87,7 +97,8 @@ func (s *AccessStats) BindMeter(meter metric.Meter) error {
 	if err == nil {
 		durHist, err = meter.Float64Histogram("webx.request.duration",
 			metric.WithDescription("request duration seconds"),
-			metric.WithUnit("s"))
+			metric.WithUnit("s"),
+			metric.WithExplicitBucketBoundaries(durationBucketBounds...))
 	}
 	if err != nil {
 		return err

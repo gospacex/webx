@@ -89,3 +89,28 @@ func TestAccessStatsBindMeterIdempotent(t *testing.T) {
 		t.Fatal("after re-bind: MetricsBound = false, want true")
 	}
 }
+
+// TestDurationBucketBoundsAreSecondsScale 防回归：耗时分桶必须是**秒**量级。
+//
+// 症状很隐蔽：分桶与单位错配不影响任何业务、不报错、单测照过，只表现为
+// 「/metrics 里 p99 算不出来、所有请求挤在一个桶」。而 OTel 的缺省分桶
+// [0,5,10,25,...,10000] 长得像毫秒档，最容易被顺手删掉显式分桶。
+func TestDurationBucketBoundsAreSecondsScale(t *testing.T) {
+	if len(durationBucketBounds) < 5 {
+		t.Fatalf("分桶太少（%d 个），秒级耗时会全部落进 1-2 档", len(durationBucketBounds))
+	}
+	for i, b := range durationBucketBounds {
+		if b <= 0 {
+			t.Fatalf("分桶 %d = %v，必须为正", i, b)
+		}
+		if i > 0 && b <= durationBucketBounds[i-1] {
+			t.Fatalf("分桶必须严格递增：%v 出现在 %v 之后", b, durationBucketBounds[i-1])
+		}
+	}
+	if last := durationBucketBounds[len(durationBucketBounds)-1]; last > 60 {
+		t.Fatalf("最大分桶 = %v 秒，量级不对（看着像毫秒档被直接搬过来了）", last)
+	}
+	if durationBucketBounds[0] > 0.05 {
+		t.Fatalf("最小分桶 = %v 秒，粒度太粗", durationBucketBounds[0])
+	}
+}
